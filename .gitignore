@@ -1,0 +1,43 @@
+# VAD 系统 .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# 模型 / 数据
+checkpoints/
+*.pt
+*.pth
+*.onnx
+data/dataset/
+data/raw/
+data/processed/
+
+# 结果
+results/
+*.wav
+*.mp3
+*.flac
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+wandb/
