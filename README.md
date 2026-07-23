@@ -5,10 +5,13 @@
 [![ONNX](https://img.shields.io/badge/ONNX-exported-005CED)](https://onnx.ai/)
 [![ONNX INT8](https://img.shields.io/badge/ONNX_INT8-quantized-FF6F00)](https://onnxruntime.ai/docs/performance/quantization.html)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED)](https://www.docker.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-server-009688)](https://fastapi.tiangolo.com/)
+[![WebSocket](https://img.shields.io/badge/WebSocket-streaming-FF5722)](https://websockets.readthedocs.io/)
 [![Makefile](https://img.shields.io/badge/Makefile-automated-232F3E)](https://www.gnu.org/software/make/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-FAB040)](https://pre-commit.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **工业级 VAD 系统**，支持 **Energy / Spectral / DNN** 三种方法，含流式检测、ONNX 导出与 INT8 量化、Docker 部署、**WebRTC VAD 基线对比**。
+> **工业级 VAD 系统**，支持 **Energy / Spectral / DNN** 三种方法，含流式检测、ONNX 导出与 INT8 量化、**FastAPI 推理服务 (REST + WebSocket)**、**实时麦克风 Demo**、Docker 部署、**WebRTC VAD 基线对比**、**错误模式分析**。
 
 ```
 输入音频 ──► 特征提取 ──► VAD决策 ──► [(start₁, end₁), (start₂, end₂), ...]
@@ -23,8 +26,13 @@
 - [DNN 模型详解](#-dnn-模型详解)
 - [行业基线对比](#-行业基线对比)
 - [快速开始](#-快速开始)
+- [生产级推理服务 (FastAPI)](#-生产级推理服务-fastapi)
+- [实时麦克风 VAD Demo](#-实时麦克风-vad-demo)
+- [错误模式分析](#-错误模式分析)
 - [部署指南](#-部署指南)
+- [工程化与代码质量](#-工程化与代码质量)
 - [评估结果](#-评估结果)
+- [系统设计文档](#-系统设计文档)
 - [面试常见问题](#-面试常见问题)
 
 ---
@@ -182,40 +190,149 @@ source scripts/setup.sh
 ### Makefile
 
 ```bash
-make install       # 安装依赖
-make train         # 训练 DNN VAD (30 epochs)
-make test          # 运行单元测试 (10 tests)
-make benchmark     # 行业基线对比评测（含 WebRTC VAD）
-make export        # 导出 ONNX
-make quantize      # ONNX INT8 量化
-make demo          # 启动 Web Demo
-make docker        # 构建 Docker 镜像
-make clean         # 清理临时文件
+make install          # 安装依赖
+make train            # 训练 DNN VAD (30 epochs)
+make test             # 运行单元测试 (10 tests)
+make benchmark        # 行业基线对比评测（含 WebRTC VAD）
+make export           # 导出 ONNX
+make quantize         # ONNX INT8 量化
+make demo             # 启动 Gradio Web Demo
+make realtime-demo    # 启动实时麦克风 VAD Demo
+make server           # 启动 FastAPI 生产推理服务
+make error-analysis   # 运行 VAD 错误模式分析
+make lint             # 代码检查 (ruff + mypy)
+make precommit        # 安装 pre-commit hooks
+make docker           # 构建 Docker 镜像
+make docs             # 查看系统设计文档
+make clean            # 清理临时文件
 ```
 
-### 快速测试
+---
 
-```python
-from vad import EnergyVAD
-from vad.utils import load_audio
+## 🚀 生产级推理服务 (FastAPI)
 
-audio, sr = load_audio("test.wav")
-vad = EnergyVAD(mode="adaptive")
-segments = vad(audio, sr)
+生产级 VAD 推理服务器，支持 **REST API** 和 **WebSocket 流式**两种接口，配备 Prometheus 监控、结构化日志、自动生成 API 文档。
 
-for s, e in segments:
-    print(f"[{s:.2f}s - {e:.2f}s] ({e-s:.2f}s)")
-```
-
-### 训练 DNN VAD
+### 启动服务
 
 ```bash
-# 合成数据训练
-python scripts/train.py --method synthetic --epochs 30
+# 安装服务依赖
+pip install fastapi uvicorn[standard] websockets prometheus-client python-multipart
 
-# 训练后基准评测（含 WebRTC VAD 对比）
-python benchmark/benchmark.py --method synthetic --n_samples 100 --dnn_model checkpoints/best.pt
+# 启动（热重载）
+make server
+# 或: python server/vad_server.py
+
+# 访问 API 文档
+# http://localhost:8000/docs     (Swagger UI)
+# http://localhost:8000/redoc    (ReDoc)
 ```
+
+### REST API 调用
+
+```bash
+# 单文件 VAD 检测
+curl -X POST http://localhost:8000/v1/vad \
+  -F "file=@test.wav" \
+  -F "method=energy"
+
+# 返回:
+# {"segments":[{"start":0.5,"end":2.3}], "total_audio_duration":5.0, "method":"energy", "latency_ms":1.23}
+
+# 批量检测
+curl -X POST http://localhost:8000/v1/vad/batch \
+  -F "files=@test1.wav" \
+  -F "files=@test2.wav" \
+  -F "method=dnn"
+```
+
+### WebSocket 流式 VAD
+
+适用于实时通话、会议转写等场景。
+
+```python
+import json, asyncio, websockets
+
+async def stream_vad():
+    async with websockets.connect("ws://localhost:8000/v1/vad/stream") as ws:
+        # 握手
+        await ws.send(json.dumps({"method": "dnn", "sample_rate": 16000}))
+        resp = await ws.recv()
+        print("Handshake:", resp)
+
+        # 发送 PCM int16 音频帧
+        import soundfile as sf
+        audio, sr = sf.read("test.wav")
+        pcm = (audio * 32768).astype("int16").tobytes()
+        await ws.send(pcm)
+
+        # 接收 VAD 结果
+        while True:
+            msg = json.loads(await ws.recv())
+            if msg["type"] == "vad":
+                print(f"帧 @{msg['timestamp_ms']}ms: {'🗣 SPEECH' if msg['is_speech'] else '🔇 SILENCE'}")
+            elif msg["type"] == "close":
+                break
+
+asyncio.run(stream_vad())
+```
+
+### 监控指标
+
+```
+http://localhost:8000/health    # 健康检查
+http://localhost:8000/metrics   # Prometheus 指标
+```
+
+| 指标 | 类型 | 说明 |
+|------|------|------|
+| `vad_requests_total` | Counter | 请求总数 (按 method/status) |
+| `vad_latency_seconds` | Histogram | 推理延迟分布 |
+| `vad_active_websockets` | Gauge | 当前 WebSocket 连接数 |
+
+---
+
+## 🎤 实时麦克风 VAD Demo
+
+从麦克风实时采集音频，边说话边显示 VAD 检测结果。使用 Energy / Spectral / DNN 方法，实时波形 + VAD 状态可视化。
+
+```bash
+# 安装额外依赖
+pip install sounddevice
+
+# 启动
+make realtime-demo
+# 或: python demo/realtime_vad.py
+# 浏览器打开 http://localhost:7861
+```
+
+**亮点**: 选择方法 → 点击启动 → 对着麦克风说话 → 实时看到波形和 VAD 状态切换。
+
+---
+
+## 🔬 错误模式分析
+
+分析 VAD 在 6 种噪声场景下的失败模式（虚警/漏检/边界偏移），定位模型薄弱环节。
+
+```bash
+# 运行分析
+make error-analysis
+# 或: python scripts/error_analysis.py --num_samples 50 --generate_report
+```
+
+输出示例:
+
+```
+EnergyVAD: 最佳场景='clean' (F1=0.9650), 最差场景='transient' (F1=0.7234)
+DNNVAD:    最佳场景='clean' (F1=0.9980), 最差场景='music' (F1=0.8890)
+
+🔧 改进建议:
+  1. 低音量场景 → 添加 AGC 预处理
+  2. 高噪声场景 → 引入谱减法前端
+  3. 瞬态脉冲误检 → 加入能量包络连续性约束
+```
+
+生成的分析报告保存在 `analysis/error_analysis_report.json`。
 
 ---
 
@@ -323,16 +440,24 @@ vad-system/
 │   ├── evaluator.py            # 帧级/段级评测指标
 │   ├── dataset.py              # PyTorch Dataset
 │   └── feature_extractor.py    # 声学特征提取
+├── server/                     # 生产级推理服务
+│   └── vad_server.py           # FastAPI + WebSocket 流式 VAD ★ 新增
 ├── scripts/
 │   ├── train.py                # DNN VAD 训练
 │   ├── inference.py            # 批量推理
 │   ├── export_onnx.py          # ONNX 导出
-│   ├── quantize_onnx.py        # ONNX INT8 量化 ← 生产优化
+│   ├── quantize_onnx.py        # ONNX INT8 量化
+│   ├── error_analysis.py       # 错误模式分析 ★ 新增
 │   └── download_pretrained.py  # 预训练模型下载
+├── demo/
+│   ├── app.py                  # Gradio Web Demo
+│   └── realtime_vad.py         # 实时麦克风 VAD Demo ★ 新增
+├── docs/
+│   └── system_design.md        # 系统设计文档 (zh-CN) ★ 新增
 ├── tests/test_vad.py           # 单元测试 (10 tests)
-├── demo/app.py                 # Gradio Web Demo
 ├── benchmark/benchmark.py      # 含 WebRTC VAD 基线对比
-├── Makefile                    # 工程自动化 ← DevOps
+├── .pre-commit-config.yaml     # Pre-commit 代码质量 ★ 新增
+├── Makefile                    # 工程自动化
 ├── Dockerfile                  # Docker 一键部署
 ├── config/config.yaml          # 全局配置
 ├── requirements.txt
@@ -341,18 +466,84 @@ vad-system/
 
 ---
 
+## 🏗 工程化与代码质量
+
+### Pre-commit Hooks
+
+一键安装代码质量检查工具链:
+
+```bash
+make precommit
+# 或: pip install pre-commit && pre-commit install
+```
+
+安装后每次 `git commit` 自动执行:
+
+| Hook | 作用 |
+|------|------|
+| `trailing-whitespace` | 去除行尾空白 |
+| `end-of-file-fixer` | 确保文件末尾空行 |
+| `check-yaml` | YAML 语法检查 |
+| `check-merge-conflict` | 检测合并冲突标记 |
+| `ruff` | Python 代码规范 (替代 flake8/isort) |
+| `black` | Python 代码格式化 |
+| `mypy` | 静态类型检查 |
+
+### 代码检查
+
+```bash
+make lint
+# ruff check . && mypy vad/
+```
+
+### CI 流程
+
+`.github/workflows/ci.yml` 在 push/PR 时自动运行:
+
+1. **lint**: flake8 (复杂度 ≤10) + mypy 类型检查
+2. **test**: 安装依赖 → pytest 单元测试 → import 检查 → benchmark smoke test
+
+---
+
+## 📖 系统设计文档
+
+完整的系统设计文档在 `docs/system_design.md`，包含:
+
+| 章节 | 内容 |
+|------|------|
+| **需求分析** | 业务需求 / 非功能需求 / 边界约束 |
+| **总体架构** | 分层架构图 / 数据流 / 关键接口 |
+| **模块详细设计** | 特征提取 / VAD 算法 / 后处理 / 流式状态机 / 评估指标 |
+| **架构决策记录 (ADR)** | 6 项关键决策及取舍分析 |
+| **训练流程** | 数据流水线 / 超参数配置 / 收敛曲线分析 |
+| **部署方案** | 部署架构图 / 水平扩展 / 监控体系 / 资源估算 |
+| **性能优化** | 已实施优化 / 后续方向 / 延迟分析 |
+| **面试 Q&A** | 10 个高频面试问题的深度解答 |
+
+```bash
+make docs    # 查看文档指引
+```
+
+---
+
 ## ❓ 面试常见问题
 
-| 面试官可能会问 | 回答要点（在本项目中可找到答案） |
-|---------------|-------------------------------|
-| **VAD 为什么重要？** | ASR 的前端过滤，节省 60%+ 推理计算量 |
-| **WebRTC VAD 的原理？** | 高斯混合模型(GMM) 在子带能量上的似然比 |
-| **你的 DNN 比 WebRTC 好多少？** | F1 高 7.3%，段检测率高 14% |
-| **模型为什么这么小？** | VAD 是帧级别二分类，大模型容易过拟合 |
-| **RTF 是什么意思？** | 处理耗时/音频时长，<1 表示实时 |
-| **为什么需要流式 VAD？** | 实时通话不能等整段音频处理完再判决 |
-| **如何部署？** | 导出 ONNX + Docker，支持 CPU/GPU |
-| **怎么衡量 VAD 好坏？** | F1 + 段检测率 + 延迟 + RTF + 不同噪声场景 |
+| 面试官可能会问 | 回答要点（在本项目中可找到答案） | 详见 |
+|---------------|-------------------------------|------|
+| **VAD 为什么重要？** | ASR 的前端过滤，节省 60%+ 推理计算量 | 需求分析 |
+| **WebRTC VAD 的原理？** | GMM 在子带能量上的似然比 | 基准对比 |
+| **你的 DNN 比 WebRTC 好多少？** | F1 高 7.3%，段检测率高 14% | 基准对比 |
+| **模型为什么这么小？** | VAD 是帧级别二分类，70K 参数足够 | ADR-002 |
+| **为什么选 Conv1D+BiGRU？** | 精度-速度最优平衡 (vs Transformer/LSTM) | ADR-001 |
+| **为什么选 Fbank 而非 MFCC？** | Fbank 保留更多频谱信息，对 VAD 更友好 | ADR-002 |
+| **RTF 是什么意思？** | 处理耗时/音频时长，<1 表示实时 | 评估指标 |
+| **为什么需要流式 VAD？** | 实时通话不能等整段音频处理完再判决 | 状态机设计 |
+| **如何生产化部署？** | FastAPI + WebSocket + Prometheus + Docker + 水平扩展 | 部署方案 |
+| **怎么衡量 VAD 好坏？** | 帧级 F1 + 段检测率 + 延迟 + RTF + 噪声场景对比 | 评估指标 |
+| **怎么保证鲁棒性？** | 多噪声训练 + 特征融合 + 后处理 + 错误模式分析 | 错误分析 |
+| **为什么用合成数据？** | 快速验证算法，后迁移到真实数据微调 | ADR-003 |
+| **如何优化延迟？** | ONNX INT8 量化 (3x) + 轻量网络 + 批量推理 | 性能优化 |
+| **项目架构设计是怎样的？** | 分层架构 (API→引擎→后处理→特征→数据) + 策略模式 | 系统设计文档 |
 
 ---
 

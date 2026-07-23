@@ -28,6 +28,10 @@ results/
 *.mp3
 *.flac
 
+# 分析报告
+analysis/
+!analysis/.gitkeep
+
 # IDE
 .vscode/
 .idea/
@@ -41,6 +45,10 @@ Thumbs.db
 # 日志
 *.log
 wandb/
+
+# 代码质量
+.ruff_cache/
+.mypy_cache/
 
 # 测试中间输出
 test_out*.txt
