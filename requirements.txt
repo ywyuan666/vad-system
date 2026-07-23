@@ -1,0 +1,24 @@
+# ── VAD 系统依赖 ──────────────────────────────────────────────────────
+# 核心
+numpy>=1.24.0
+scipy>=1.10.0
+
+# 音频处理
+soundfile>=0.12.0
+librosa>=0.10.0
+
+# 深度学习（DNN VAD 需要，可选）
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# 配置
+PyYAML>=6.0
+
+# Web Demo（可选）
+gradio>=4.0.0
+
+# 数据可视化（可选）
+matplotlib>=3.7.0
+
+# 数据处理（Common Voice 需要，可选）
+pandas>=2.0.0
