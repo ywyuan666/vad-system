@@ -58,16 +58,12 @@ def create_waveform_plot(
     # 绘制波形
     ax.plot(t, audio, color="gray", alpha=0.6, linewidth=0.5)
 
-    # 高亮语音段
-    for start, end in segments:
-        s_idx = int(start * sr)
-        e_idx = int(end * sr)
-        ax.axvspan(start, end, alpha=0.2, color="green", label="语音" if "语音" not in
-                   [l.get_text() for l in ax.get_legend().get_texts()] if ax.get_legend() else True)
+    # 先通过空绘图创建图例条目，避免循环中重复 label
+    ax.plot([], [], color="green", alpha=0.2, linewidth=8, label="语音 (VAD)")
 
-    # 添加语音段标签
-    if segments:
-        ax.axvspan(0, 0, alpha=0.2, color="green", label="语音 (VAD)")
+    # 高亮语音段（不带 label 参数，避免图例重复）
+    for start, end in segments:
+        ax.axvspan(start, end, alpha=0.2, color="green")
 
     ax.set_xlabel("时间 (秒)")
     ax.set_ylabel("振幅")
@@ -109,8 +105,8 @@ def vad_process(
     elif method == "Spectral":
         vad = SpectralVAD(flatness_thresh=flatness_thresh)
     elif method == "DNN":
-        if not dnn_model:
-            return "请指定 DNN 模型路径 (.pt)", None, ""
+        if not dnn_model or dnn_model == "(训练后出现)":
+            return "请先训练 DNN 模型 (python scripts/train.py)", None, ""
         vad = DNNVAD(model_path=dnn_model, prob_threshold=prob_threshold)
     else:
         return f"未知方法: {method}", None, ""
@@ -199,7 +195,7 @@ def main() -> None:
 
                 with gr.Accordion("DNN VAD 参数", open=False):
                     dnn_model = gr.Dropdown(
-                        choices=model_paths if model_paths else ["(训练后出现)"],
+                        choices=model_paths if model_paths else ["训练一个模型 (...)"] + model_paths,
                         label="模型路径",
                         value=model_paths[0] if model_paths else None,
                     )

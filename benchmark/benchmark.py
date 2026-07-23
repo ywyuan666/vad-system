@@ -15,7 +15,6 @@ VAD 方法对比评测
 
 import argparse
 import json
-import argparse
 import os
 import sys
 import time

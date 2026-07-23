@@ -22,18 +22,21 @@
     Output (T x 1)  帧级别语音概率
 """
 
-from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import numpy as np
 
 from .feature_extractor import FeatureExtractor
-from .utils import mask_to_segments, merge_segments
+from .utils import (
+    ensure_sr,
+    mask_to_segments,
+    merge_segments,
+    remove_short,
+)
 
 try:
     import torch
     import torch.nn as nn
-    import torch.nn.functional as F
 
     HAS_TORCH = True
 except ImportError:
@@ -155,13 +158,15 @@ class DNNVAD:
         Returns:
             [(start, end), ...] 语音段列表。
         """
+        # ── 边界保护 ────────────────────────────────────────────────
+        if len(audio) == 0:
+            return []
         if sr is not None and sr != self.feat.sr:
-            import librosa
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=self.feat.sr)
+            audio = ensure_sr(audio, sr, self.feat.sr)
 
         # 提取 Fbank
         fbank = self.feat.fbank(audio)  # (T, n_mels)
-        if fbank.shape[0] == 0:
+        if fbank.shape[0] < 2:          # 至少需要 2 帧才能做有意义的 GRU 推理
             return []
 
         # 归一化
@@ -177,8 +182,8 @@ class DNNVAD:
         speech_mask = probs > self.prob_threshold
 
         # 后处理
-        speech_mask = self._remove_short(speech_mask, self.min_speech_frames, True)
-        speech_mask = self._remove_short(speech_mask, self.min_silence_frames, False)
+        speech_mask = remove_short(speech_mask, self.min_speech_frames, True)
+        speech_mask = remove_short(speech_mask, self.min_silence_frames, False)
 
         segments = mask_to_segments(speech_mask, self.hop_length, self.feat.sr)
         return merge_segments(segments, min_duration=0.08, max_silence=0.3)
@@ -201,19 +206,3 @@ class DNNVAD:
         x = torch.from_numpy(fbank).float().unsqueeze(0).to(self.device)
         probs = self.model(x).squeeze().cpu().numpy()
         return probs
-
-    @staticmethod
-    def _remove_short(mask: np.ndarray, min_len: int, value: bool) -> np.ndarray:
-        out = mask.copy()
-        i = 0
-        while i < len(out):
-            if out[i] == value:
-                j = i
-                while j < len(out) and out[j] == value:
-                    j += 1
-                if j - i < min_len:
-                    out[i:j] = not value
-                i = j
-            else:
-                i += 1
-        return out

@@ -25,6 +25,56 @@ def load_audio(path: str, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
     return audio, sr
 
 
+def ensure_sr(
+    audio: np.ndarray,
+    orig_sr: int,
+    target_sr: int = 16000,
+) -> np.ndarray:
+    """确保音频采样率为 target_sr，必要时重采样（带异常保护）。
+
+    Args:
+        audio: 输入音频数组。
+        orig_sr: 原始采样率。
+        target_sr: 目标采样率。
+
+    Returns:
+        重采样后的音频数组。重采样失败则返回原音频（降级处理）。
+    """
+    if orig_sr == target_sr or len(audio) == 0:
+        return audio
+    try:
+        import librosa
+        return librosa.resample(audio, orig_sr=orig_sr, target_sr=target_sr)
+    except Exception:
+        return audio
+
+
+def remove_short(mask: np.ndarray, min_len: int, value: bool) -> np.ndarray:
+    """移除/填充过短的连续段。
+
+    Args:
+        mask: 布尔数组。
+        min_len: 最小连续长度。
+        value: 要检查的值（True 移除语音毛刺，False 填充静音间隙）。
+
+    Returns:
+        处理后的布尔数组。
+    """
+    out = mask.copy()
+    i = 0
+    while i < len(out):
+        if out[i] == value:
+            j = i
+            while j < len(out) and out[j] == value:
+                j += 1
+            if j - i < min_len:
+                out[i:j] = not value
+            i = j
+        else:
+            i += 1
+    return out
+
+
 def frames_to_time(frame_idx: int, hop_length: int, sr: int) -> float:
     """将帧索引转换为时间（秒）。"""
     return frame_idx * hop_length / sr

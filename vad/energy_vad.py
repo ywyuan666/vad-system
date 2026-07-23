@@ -14,7 +14,12 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from .feature_extractor import FeatureExtractor
-from .utils import mask_to_segments, merge_segments
+from .utils import (
+    ensure_sr,
+    mask_to_segments,
+    merge_segments,
+    remove_short,
+)
 
 
 class EnergyVAD:
@@ -63,13 +68,18 @@ class EnergyVAD:
         Returns:
             [(start_sec, end_sec), ...] 语音段列表。
         """
+        # ── 边界保护 ────────────────────────────────────────────────
+        if len(audio) == 0:
+            return []
         if sr is not None and sr != self.feat.sr:
-            import librosa
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=self.feat.sr)
+            audio = ensure_sr(audio, sr, self.feat.sr)
 
         # 提取能量和过零率
         energy = self.feat.rms_energy(audio).squeeze(-1)  # (T,)
-        speech_mask = self._detect(energy)
+        if len(energy) < 3:
+            return []
+
+        speech_mask = self._detect(audio, energy)
 
         # 后处理
         speech_mask = self._smooth(speech_mask)
@@ -79,7 +89,7 @@ class EnergyVAD:
         segments = mask_to_segments(speech_mask, self.hop_length, self.feat.sr)
         return merge_segments(segments, min_duration=0.08, max_silence=0.3)
 
-    def _detect(self, energy: np.ndarray) -> np.ndarray:
+    def _detect(self, audio: np.ndarray, energy: np.ndarray) -> np.ndarray:
         """核心检测逻辑。"""
         if self.mode == "fixed" and self.energy_thresh is not None:
             thresh = self.energy_thresh
@@ -106,25 +116,8 @@ class EnergyVAD:
 
     def _remove_spikes(self, mask: np.ndarray) -> np.ndarray:
         """移除过短的语音毛刺。"""
-        return self._remove_short(mask, self.min_speech_frames, True)
+        return remove_short(mask, self.min_speech_frames, True)
 
     def _fill_gaps(self, mask: np.ndarray) -> np.ndarray:
         """填充过短的静音间隙。"""
-        return self._remove_short(~mask, self.min_silence_frames, False)
-
-    @staticmethod
-    def _remove_short(mask: np.ndarray, min_len: int, value: bool) -> np.ndarray:
-        """移除/填充过短的连续段。"""
-        out = mask.copy()
-        i = 0
-        while i < len(out):
-            if out[i] == value:
-                j = i
-                while j < len(out) and out[j] == value:
-                    j += 1
-                if j - i < min_len:
-                    out[i:j] = not value
-                i = j
-            else:
-                i += 1
-        return out
+        return remove_short(~mask, self.min_silence_frames, False)

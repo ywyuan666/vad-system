@@ -16,7 +16,12 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from .feature_extractor import FeatureExtractor
-from .utils import mask_to_segments, merge_segments, frames_to_time
+from .utils import (
+    ensure_sr,
+    mask_to_segments,
+    merge_segments,
+    remove_short,
+)
 
 
 class SpectralVAD:
@@ -67,14 +72,19 @@ class SpectralVAD:
         self.min_silence_frames = min_silence_frames
 
     def __call__(self, audio: np.ndarray, sr: Optional[int] = None) -> List[Tuple[float, float]]:
+        # ── 边界保护 ────────────────────────────────────────────────
+        if len(audio) == 0:
+            return []
         if sr is not None and sr != self.feat.sr:
-            import librosa
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=self.feat.sr)
+            audio = ensure_sr(audio, sr, self.feat.sr)
 
         # 提取多种谱特征
         energy = self.feat.rms_energy(audio).squeeze(-1)       # (T,)
         flatness = self.feat.spectral_flatness(audio)          # (T,)
         centroid = self.feat.spectral_centroid(audio).squeeze(-1)  # (T,)
+
+        if len(energy) < 3:
+            return []
 
         speech_mask = self._detect(energy, flatness, centroid)
         speech_mask = self._post_process(speech_mask)
@@ -121,22 +131,6 @@ class SpectralVAD:
         """中值平滑 + 去毛刺 + 填间隙。"""
         from scipy.ndimage import median_filter
         mask = median_filter(mask.astype(float), size=self.smoothing_window) > 0.5
-        mask = self._remove_short(mask, self.min_speech_frames, True)
-        mask = self._remove_short(mask, self.min_silence_frames, False)
+        mask = remove_short(mask, self.min_speech_frames, True)
+        mask = remove_short(mask, self.min_silence_frames, False)
         return mask
-
-    @staticmethod
-    def _remove_short(mask: np.ndarray, min_len: int, value: bool) -> np.ndarray:
-        out = mask.copy()
-        i = 0
-        while i < len(out):
-            if out[i] == value:
-                j = i
-                while j < len(out) and out[j] == value:
-                    j += 1
-                if j - i < min_len:
-                    out[i:j] = not value
-                i = j
-            else:
-                i += 1
-        return out

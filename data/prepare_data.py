@@ -19,7 +19,6 @@ VAD 数据准备脚本
 """
 
 import argparse
-import argparse
 import json
 import os
 import sys
