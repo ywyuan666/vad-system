@@ -22,3 +22,6 @@ matplotlib>=3.7.0
 
 # 数据处理（Common Voice 需要，可选）
 pandas>=2.0.0
+
+# 行业基线对比（可选）
+webrtcvad>=2.0.10

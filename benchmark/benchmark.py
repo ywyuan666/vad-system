@@ -97,14 +97,56 @@ def create_synthetic_test_data(n_samples: int, sr: int = 16000) -> list:  # type
 
 
 def create_vad_instances(dnn_model: str = None):
-    """创建所有 VAD 实例。"""
-    vads = {
+    """创建所有 VAD 实例（含行业基线对比）。"""
+    from vad import DNNVAD as _
+    vads: dict = {
         "Energy (adaptive)": EnergyVAD(mode="adaptive", adaptive_ratio=2.5),
         "Energy (fixed)": EnergyVAD(mode="fixed", energy_thresh=0.02),
         "Spectral": SpectralVAD(),
     }
     if dnn_model and os.path.exists(dnn_model):
-        vads["DNN"] = DNNVAD(model_path=dnn_model)
+        vads["DNN (ours)"] = DNNVAD(model_path=dnn_model)
+
+    # ── WebRTC VAD 基线 ──────────────────────────────────────────
+    try:
+        import webrtcvad
+
+        class _WebRTCVAD:
+            """适配 WebRTC VAD 到本项目的接口。"""
+            def __init__(self, mode: int = 0):
+                self._vad = webrtcvad.Vad(mode)
+                self.sr = 16000
+
+            def __call__(self, audio, sr=None):  # type: ignore[no-untyped-def]
+                if len(audio) == 0:
+                    return []
+                import librosa
+                if sr is not None and sr != self.sr:
+                    audio = librosa.resample(audio, orig_sr=sr, target_sr=self.sr)
+                audio_int16 = (audio * 32767).astype(np.int16)
+                frame_len = 320  # 20ms @ 16kHz
+                segments = []
+                speech_start = None
+                for i in range(0, len(audio_int16) - frame_len + 1, frame_len):
+                    frame = audio_int16[i:i + frame_len].tobytes()
+                    is_speech = self._vad.is_speech(frame, self.sr)
+                    t = i / self.sr
+                    if is_speech and speech_start is None:
+                        speech_start = t
+                    elif not is_speech and speech_start is not None:
+                        if t - speech_start > 0.1:
+                            segments.append((speech_start, t))
+                        speech_start = None
+                if speech_start is not None:
+                    segments.append((speech_start, len(audio) / self.sr))
+                from vad.utils import merge_segments
+                return merge_segments(segments, min_duration=0.08, max_silence=0.3)
+
+        vads["WebRTC VAD (aggressive)"] = _WebRTCVAD(mode=3)
+        vads["WebRTC VAD (normal)"] = _WebRTCVAD(mode=0)
+    except ImportError:
+        print("  [SKIP] 未安装 webrtcvad, 跳过 WebRTC VAD 基线对比 (pip install webrtcvad)")
+
     return vads
 
 
