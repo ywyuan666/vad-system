@@ -8,10 +8,12 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-server-009688)](https://fastapi.tiangolo.com/)
 [![WebSocket](https://img.shields.io/badge/WebSocket-streaming-FF5722)](https://websockets.readthedocs.io/)
 [![Makefile](https://img.shields.io/badge/Makefile-automated-232F3E)](https://www.gnu.org/software/make/)
+[![Ablation](https://img.shields.io/badge/Ablation-15_experiments-7B1FA2)](https://github.com/ywyuan666/vad-system)
+[![Model Card](https://img.shields.io/badge/Model_Card-available-00BCD4)](https://github.com/ywyuan666/vad-system)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-FAB040)](https://pre-commit.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **工业级 VAD 系统**，支持 **Energy / Spectral / DNN** 三种方法，含流式检测、ONNX 导出与 INT8 量化、**FastAPI 推理服务 (REST + WebSocket)**、**实时麦克风 Demo**、Docker 部署、**WebRTC VAD 基线对比**、**错误模式分析**。
+> **工业级 VAD 系统**，支持 **Energy / Spectral / DNN** 三种方法，含流式检测、ONNX 导出与 INT8 量化、**FastAPI 推理服务 (REST + WebSocket)**、**实时麦克风 Demo**、Docker 部署、**WebRTC VAD 基线对比**、**错误模式分析**、**消融实验**、**模型可解释性**、**集成 VAD**、**Python SDK**、**Model Card**。
 
 ```
 输入音频 ──► 特征提取 ──► VAD决策 ──► [(start₁, end₁), (start₂, end₂), ...]
@@ -29,6 +31,11 @@
 - [生产级推理服务 (FastAPI)](#-生产级推理服务-fastapi)
 - [实时麦克风 VAD Demo](#-实时麦克风-vad-demo)
 - [错误模式分析](#-错误模式分析)
+- [消融实验 (Ablation Study)](#-消融实验-ablation-study)
+- [模型可解释性](#-模型可解释性)
+- [集成 VAD + 自适应阈值](#-集成-vad--自适应阈值)
+- [Python SDK](#-python-sdk)
+- [Model Card](#-model-card)
 - [部署指南](#-部署指南)
 - [工程化与代码质量](#-工程化与代码质量)
 - [评估结果](#-评估结果)
@@ -336,7 +343,147 @@ DNNVAD:    最佳场景='clean' (F1=0.9980), 最差场景='music' (F1=0.8890)
 
 ---
 
-## 🏭 部署指南
+## 🔬 消融实验 (Ablation Study)
+
+**"没有消融实验的论文，审稿人不会信服；没有消融实验的项目，面试官也不会。"**
+
+系统性证明每个设计决策的贡献，涵盖 15 组实验、5 个维度：
+
+| 类别 | 实验 | 假设 |
+|------|------|------|
+| **特征** (A1-A3) | MFCC vs Fbank / 移除谱平坦度 / 移除谱质心 | Fbank 对 VAD 最关键 |
+| **模型** (A4-A6) | Conv1D only / BiGRU→LSTM / BiGRU→GRU | 双向 GRU 时序建模不可替代 |
+| **训练** (A7-A9) | 移除增强 / 移除 CosineAnnealing / 移除梯度裁剪 | 数据增强贡献大于 LR 策略 |
+| **后处理** (A10-A12) | 移除中值滤波 / 不填充间隙 / 不合并段 | 后处理对段级别指标影响大 |
+| **阈值** (A13-A14) | 阈值 0.3 / 0.7 / 帧长 5ms / 20ms | 默认 0.5 是最优平衡点 |
+
+```bash
+# 运行全部实验
+make ablation
+# 或: python scripts/ablation_study.py
+
+# 快速验证
+make ablation-quick
+# 或: python scripts/ablation_study.py --quick
+```
+
+**面试加分点**: 能拿出消融实验数据，说明你知道"为什么选 A 不选 B"，而非"别人都这么做"。
+
+---
+
+## 👁 模型可解释性
+
+使用 **Grad-CAM** 和 **遮挡敏感度** 可视化 DNN VAD 在做决策时"看"了哪些时频区域。
+
+```bash
+make interpret
+# 或: python scripts/model_interpretation.py
+# 输出: ./interpretation/*.png
+```
+
+生成的图表包括:
+- **Grad-CAM 热力图**: 模型注意力随时间的变化
+- **遮挡敏感度**: 遮挡某一区域后 VAD 输出的变化程度
+- **决策边界**: 在能量-谱平坦度空间的 2D 决策边界
+- **综合分析**: 波形 + Fbank + Grad-CAM + 遮挡 四合一
+
+> **面试时展示**: "我们的 VAD 模型在语音段的**起始边界**处注意力最高——说明它学到的是'从静到音'的瞬态变化，而非稳态语音本身。"
+
+---
+
+## 🤝 集成 VAD + 自适应阈值
+
+### 集成策略
+
+融合多种 VAD 方法，利用互补优势:
+
+| 策略 | 规则 | 适用场景 |
+|------|------|---------|
+| **voting** | ≥2/3 方法判定为语音 → 语音 | 通用 (默认) |
+| **weighted** | 按历史 F1 加权融合 | 已知各方法表现 |
+| **or** | 任一方法判定 → 语音 | 高召回 (安全) |
+| **and** | 全部方法判定 → 语音 | 高精度 (会议) |
+
+```python
+from vad.ensemble_vad import EnsembleVAD
+
+ensemble = EnsembleVAD(strategy="voting")
+segments = ensemble.detect(audio)
+```
+
+### 自适应阈值
+
+基于实时噪声估计自动调整 DNN VAD 阈值:
+
+```python
+from vad.ensemble_vad import AdaptiveThresholdVAD
+
+adaptive = AdaptiveThresholdVAD()
+segments = adaptive.detect(audio)
+# 安静环境 → 阈值 0.3～0.5 (不放过弱语音)
+# 嘈杂环境 → 阈值 0.6～0.75 (降低虚警)
+```
+
+> **面试展示**: "固定阈值在跨场景时必然有 trade-off；自适应阈值让模型在不同 SNR 下自动调整，实现场景无关的鲁棒性。"
+
+---
+
+## 📦 Python SDK
+
+生产级 Python 客户端，支持同步 / 异步 / WebSocket 三种模式:
+
+```bash
+pip install requests httpx websockets
+```
+
+```python
+# 同步客户端
+from client import VADClient
+client = VADClient("http://localhost:8000")
+result = client.vad("test.wav", method="dnn")
+print(f"检测到 {len(result.segments)} 段语音, 耗时 {result.latency_ms}ms")
+
+# 状态一键检查
+health = client.health()
+print(f"服务状态: {health.engines_summary}")
+```
+
+```python
+# WebSocket 流式客户端
+from client import StreamVADClient
+with StreamVADClient() as stream:
+    stream.connect(method="dnn")
+    for vad_msg in stream.process_file("test.wav"):
+        if vad_msg["type"] == "vad":
+            status = "🗣" if vad_msg["is_speech"] else "🔇"
+            print(f"@{vad_msg['timestamp_ms']}ms {status}")
+```
+
+```python
+# 异步客户端 (高并发)
+from client import AsyncVADClient
+async with AsyncVADClient() as client:
+    results = await client.batch_vad(["a.wav", "b.wav", "c.wav"])
+```
+
+---
+
+## 📋 Model Card
+
+遵循 Google [Model Cards for Model Reporting](https://arxiv.org/abs/1810.03993) 规范，提供完整的模型结构化信息:
+
+| 内容 | 位置 |
+|------|------|
+| 模型概述与架构 | `docs/MODEL_CARD.md` |
+| 训练数据分布与局限 | `docs/MODEL_CARD.md` |
+| 完整评估结果 (含噪声) | `docs/MODEL_CARD.md` |
+| 部署建议与硬件需求 | `docs/MODEL_CARD.md` |
+| 消融实验摘要 | `docs/MODEL_CARD.md` |
+| 公平性与偏见分析 | `docs/MODEL_CARD.md` |
+
+> **面试展示**: Model Card 是 Google 倡导的模型文档标准，展示了"负责任地使用 AI"的意识——大厂面试官非常看重这点。
+
+---
 
 ### ONNX 导出（推荐生产用）
 

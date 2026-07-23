@@ -16,6 +16,7 @@ from .dnn_vad import DNNVAD
 from .streaming_vad import StreamingVAD
 from .evaluator import VADEvaluator
 from .feature_extractor import FeatureExtractor
+from .ensemble_vad import EnsembleVAD, AdaptiveThresholdVAD
 
 __all__ = [
     "EnergyVAD",
@@ -24,4 +25,6 @@ __all__ = [
     "StreamingVAD",
     "VADEvaluator",
     "FeatureExtractor",
+    "EnsembleVAD",
+    "AdaptiveThresholdVAD",
 ]
