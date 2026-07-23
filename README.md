@@ -172,15 +172,17 @@ segments = vad(audio, sr)
 ### 4. StreamingVAD — 流式检测
 
 ```python
-from vad import EnergyVAD, StreamingVAD
+from vad import DNNVAD, StreamingVAD
 
-# 创建底层检测器
-base_vad = EnergyVAD()
+# DNNVAD 的 predict_frames 可与 StreamingVAD 配合使用
+dnn_vad = DNNVAD(model_path="checkpoints/best.pt")
 
-# 包装为流式 VAD
-stream_vad = StreamingVAD(
-    state_detector=base_vad._detect,
-)
+# 包装：音频块 → 帧级别语音概率 → 二值 mask
+def frame_detector(chunk, sr):
+    fbank = dnn_vad.feat.fbank(chunk)
+    return dnn_vad.predict_frames(fbank) > dnn_vad.prob_threshold
+
+stream_vad = StreamingVAD(state_detector=frame_detector)
 
 # 逐帧处理
 for chunk in audio_stream:

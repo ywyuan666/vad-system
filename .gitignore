@@ -41,3 +41,8 @@ Thumbs.db
 # 日志
 *.log
 wandb/
+
+# 测试中间输出
+test_out*.txt
+test_err*.txt
+.pytest_cache/
