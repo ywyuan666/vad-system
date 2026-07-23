@@ -2,9 +2,7 @@
 """
 VAD 系统消融实验 (Ablation Study)
 ==================================
-系统性证明每个设计决策的贡献，展示科学研究的严谨性。
-
-"没有消融实验的论文，审稿人不会信服。"
+系统性验证每个设计决策的实际贡献，量化各模块对性能的影响。
 
 实验列表:
   A0. Baseline (完整方案)
@@ -546,7 +544,7 @@ def save_results(results: list[AblationResult], output_dir: str) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="VAD 系统消融实验 — 系统证明每个设计决策的价值",
+        description="VAD 系统消融实验 — 系统验证每个设计决策的实际贡献",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
