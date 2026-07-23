@@ -32,7 +32,7 @@ from vad import EnergyVAD, SpectralVAD, DNNVAD
 from vad.utils import load_audio, save_segments_to_audio
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VAD 推理")
     parser.add_argument("--method", type=str, required=True,
                         choices=["energy", "spectral", "dnn"],
@@ -65,7 +65,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def process_single(audio_path: str, vad, args) -> dict:
+def process_single(audio_path: str, vad: object, args: argparse.Namespace) -> dict:  # type: ignore[type-arg]
     """处理单个音频文件。"""
     audio, sr = load_audio(audio_path)
     segments = vad(audio, sr)
@@ -89,7 +89,7 @@ def process_single(audio_path: str, vad, args) -> dict:
     return result
 
 
-def main():
+def main() -> None:
     args = parse_args()
     os.makedirs(args.output, exist_ok=True)
 

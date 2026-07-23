@@ -18,8 +18,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np
 from typing import List, Tuple
+
+import numpy as np
 
 try:
     import gradio as gr
@@ -144,7 +145,7 @@ def vad_process(
     return result_text, fig, export_info
 
 
-def main():
+def main() -> None:
     if not HAS_GRADIO:
         print("请安装 gradio: pip install gradio")
         return

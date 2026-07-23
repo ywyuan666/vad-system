@@ -11,10 +11,11 @@
 适用于实时通信、语音唤醒、流式 ASR 等场景。
 """
 
-import numpy as np
-from typing import Callable, List, Optional, Tuple
-from enum import Enum
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Callable, List, Optional, Tuple
+
+import numpy as np
 
 
 class VADState(Enum):
@@ -70,7 +71,7 @@ class StreamingVAD:
         self._current_start: float = 0.0
         self._total_processed_ms: float = 0.0
 
-    def reset(self):
+    def reset(self) -> None:
         """重置流式状态（开始新音频流时调用）。"""
         self._buffer = np.array([], dtype=np.float32)
         self._state = VADState.SILENCE

@@ -9,9 +9,10 @@ VAD 评估模块
     - ROC 曲线 / DET 曲线数据
 """
 
-import numpy as np
-from typing import Callable, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 from .utils import segments_to_mask, mask_to_segments
 

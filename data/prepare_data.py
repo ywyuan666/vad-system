@@ -19,6 +19,7 @@ VAD 数据准备脚本
 """
 
 import argparse
+import argparse
 import json
 import os
 import sys
@@ -26,11 +27,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import numpy as np
 from typing import List, Tuple
 
+import numpy as np
 
-def parse_args():
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VAD 数据准备")
     parser.add_argument("--method", type=str, required=True,
                         choices=["synthetic", "common_voice", "noise_mix"],
@@ -49,7 +51,7 @@ def generate_synthetic_data(
     n_samples: int = 500,
     sr: int = 16000,
     max_duration: float = 8.0,
-):
+) -> None:
     """生成合成 VAD 训练数据。
 
     生成包含干净噪声 + 模拟语音信号的音频，
@@ -136,7 +138,7 @@ def generate_pink_noise(n_samples: int) -> np.ndarray:
     return pink / (np.std(pink) + 1e-10)
 
 
-def main():
+def main() -> None:
     args = parse_args()
 
     if args.method == "synthetic":

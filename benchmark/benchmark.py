@@ -15,6 +15,7 @@ VAD 方法对比评测
 
 import argparse
 import json
+import argparse
 import os
 import sys
 import time
@@ -39,7 +40,7 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VAD 方法对比评测")
     parser.add_argument("--method", type=str, default="synthetic",
                         choices=["synthetic", "custom"],
@@ -54,7 +55,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_synthetic_test_data(n_samples: int, sr: int = 16000) -> list:
+def create_synthetic_test_data(n_samples: int, sr: int = 16000) -> list:  # type: ignore[type-arg]
     """生成合成测试数据。"""
     from vad.utils import mask_to_segments
 
@@ -108,7 +109,11 @@ def create_vad_instances(dnn_model: str = None):
     return vads
 
 
-def run_benchmark(test_cases, vads, output_dir: str):
+def run_benchmark(
+    test_cases: list,  # type: ignore[type-arg]
+    vads: dict,  # type: ignore[type-arg]
+    output_dir: str,
+) -> pd.DataFrame:
     """运行对比评测。"""
     os.makedirs(output_dir, exist_ok=True)
     evaluator = VADEvaluator()
@@ -122,18 +127,20 @@ def run_benchmark(test_cases, vads, output_dir: str):
         frame_f1s = []
         seg_detections = []
         latencies = []
+        audios_duration = []
 
         for case in test_cases:
             audio = case["audio"]
             label_segments = case["segments"]
 
-            # 测延迟
+            # 测延迟和 RTF（实时率 = 处理耗时 / 音频时长）
+            audio_duration = len(audio) / case["sr"]
             t0 = time.perf_counter()
             hyp_segments = vad_fn(audio, case["sr"])
-            latency = (time.perf_counter() - t0) * 1000  # ms
+            proc_time = time.perf_counter() - t0
+            latency = proc_time * 1000  # ms
+            rtf = proc_time / audio_duration if audio_duration > 0 else 0
 
-            # 如果 VAD 返回 callable，用 evaluator 的 prob_fn 参数
-            # 这里直接评估 segments
             try:
                 result = evaluator.evaluate(
                     lambda a, sr: vad_fn(a, sr), audio, label_segments
@@ -141,6 +148,7 @@ def run_benchmark(test_cases, vads, output_dir: str):
                 frame_f1s.append(result.frame.f1_score)
                 seg_detections.append(result.segment.detection_rate)
                 latencies.append(latency)
+                audios_duration.append(audio_duration)
             except Exception as e:
                 print(f"  评测异常: {e}")
 
@@ -148,16 +156,18 @@ def run_benchmark(test_cases, vads, output_dir: str):
         avg_f1 = np.mean(frame_f1s) if frame_f1s else 0
         avg_det = np.mean(seg_detections) if seg_detections else 0
         avg_lat = np.mean(latencies) if latencies else 0
+        avg_rtf = np.mean(latencies) / 1000 / np.mean(audios_duration) if audios_duration else 0
 
         print(f"  帧级别 F1:     {avg_f1:.4f}")
         print(f"  段检测率:      {avg_det:.4f}")
-        print(f"  平均延迟:      {avg_lat:.2f} ms")
+        print(f"  平均延迟:      {avg_lat:.2f} ms  |  RTF: {avg_rtf:.4f}")
 
         results.append({
             "VAD 方法": vad_name,
             "帧级别 F1": round(avg_f1, 4),
             "段检测率": round(avg_det, 4),
             "延迟 (ms)": round(avg_lat, 2),
+            "RTF": round(avg_rtf, 4),
         })
 
     # 保存结果
@@ -170,13 +180,13 @@ def run_benchmark(test_cases, vads, output_dir: str):
     # 绘制柱状图
     if HAS_MATPLOTLIB:
         fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-        metrics = ["帧级别 F1", "段检测率", "延迟 (ms)"]
+        metrics = ["帧级别 F1", "段检测率", "RTF"]
         for ax, metric in zip(axes, metrics):
             vals = [r[metric] for r in results]
             names = [r["VAD 方法"] for r in results]
             bars = ax.bar(names, vals, color=["#4ECDC4", "#FF6B6B", "#45B7D1", "#96CEB4"])
             ax.set_title(metric)
-            ax.set_ylim(0, max(vals) * 1.2 if metric != "延迟 (ms)" else max(vals) * 1.3)
+            ax.set_ylim(0, max(vals) * 1.2 if metric != "RTF" else max(vals) * 1.3)
             for bar, v in zip(bars, vals):
                 ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
                         f"{v:.3f}", ha="center", va="bottom", fontsize=9)
@@ -191,7 +201,7 @@ def run_benchmark(test_cases, vads, output_dir: str):
     return df
 
 
-def main():
+def main() -> None:
     args = parse_args()
 
     if args.method == "synthetic":

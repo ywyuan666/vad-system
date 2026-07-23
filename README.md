@@ -27,12 +27,20 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/<your-username>/vad-system.git
+git clone https://github.com/ywyuan666/vad-system.git
 cd vad-system
 
 # 安装依赖
 pip install -r requirements.txt
 ```
+
+### 一键环境配置 (Linux)
+
+```bash
+source scripts/setup.sh
+```
+
+脚本会自动检测 GPU、创建虚拟环境、安装依赖。
 
 ### 快速测试
 
@@ -218,9 +226,9 @@ python demo/app.py
 ## 📚 参考
 
 - [Ramirez, J., et al. "Voice activity detection. fundamentals and speech recognition system robustness." (2007)](https://ieeexplore.ieee.org/book/5236809)
-- [WebRTC VAD](https://webrtc.org/)
-- [Silero VAD](https://github.com/snakers4/silero-vad)
-- [WeNet — End-to-End Speech Recognition](https://github.com/wenet-e2e/wenet)
+- [WebRTC VAD — 语音活动检测](https://webrtc.org/architecture/#vad)
+- [Silero VAD — 预训练 VAD 模型](https://github.com/snakers4/silero-vad)
+- [WeNet — 端到端语音识别框架](https://github.com/wenet-e2e/wenet)
 
 ## 📄 License
 

@@ -25,6 +25,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import List, Tuple
 
 # 将项目根目录加入 sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -41,7 +42,7 @@ from vad.evaluator import VADEvaluator
 from vad.utils import load_audio, segments_to_mask
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="训练 DNN VAD 模型")
     parser.add_argument("--config", type=str, help="配置文件路径")
     parser.add_argument("--method", type=str, default="synthetic",
@@ -94,7 +95,7 @@ def create_synthetic_data(
     n_samples: int = 100,
     sr: int = 16000,
     duration: float = 5.0,
-) -> tuple:
+) -> Tuple[List[np.ndarray], List[List[Tuple[float, float]]]]:
     """生成简单的合成训练数据。
 
     Args:
@@ -181,7 +182,13 @@ def create_common_voice_data(data_dir: str, sr: int = 16000) -> tuple:
     return audio_list, label_segments_list
 
 
-def train_epoch(model, loader, criterion, optimizer, device):
+def train_epoch(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.BCELoss,
+    optimizer: optim.Optimizer,
+    device: torch.device,
+) -> float:
     model.train()
     total_loss = 0.0
     n_batches = 0
@@ -203,7 +210,12 @@ def train_epoch(model, loader, criterion, optimizer, device):
     return total_loss / max(n_batches, 1)
 
 
-def validate(model, loader, criterion, device):
+def validate(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.BCELoss,
+    device: torch.device,
+) -> Tuple[float, float]:
     model.eval()
     total_loss = 0.0
     n_batches = 0
@@ -237,7 +249,7 @@ def validate(model, loader, criterion, device):
     return avg_loss, f1
 
 
-def main():
+def main() -> None:
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
     print(f"设备: {args.device}")

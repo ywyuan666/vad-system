@@ -10,9 +10,10 @@ VAD 数据集模块
 每个样本是固定长度的 Fbank 片段 + 对应的帧级别标签。
 """
 
-import numpy as np
 import random
 from typing import Callable, List, Optional, Tuple
+
+import numpy as np
 
 from .feature_extractor import FeatureExtractor
 from .utils import segments_to_mask
@@ -79,7 +80,7 @@ class VADDataset(Dataset):
         self,
         audio_list: List[np.ndarray],
         label_segments_list: List[List[Tuple[float, float]]],
-    ):
+    ) -> None:
         for audio, segments in zip(audio_list, label_segments_list):
             duration = len(audio) / self.sr
             fbank = self.feat.fbank(audio)  # (T, n_mels)
@@ -131,7 +132,9 @@ class VADDataset(Dataset):
         return fbank
 
     @staticmethod
-    def collate_fn(batch):
+    def collate_fn(
+        batch: List[Tuple[torch.Tensor, torch.Tensor]],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """批处理打包函数。"""
         fbanks, labels = zip(*batch)
         fbank_shape = fbanks[0].shape

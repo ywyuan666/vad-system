@@ -1,0 +1,68 @@
+# ══════════════════════════════════════════════════════════════════════
+# VAD 系统配置文件
+# ══════════════════════════════════════════════════════════════════════
+
+# ─── 全局参数 ────────────────────────────────────────────────────────
+global:
+  sr: 16000               # 采样率
+  hop_length: 160         # 帧移 (10ms @ 16kHz)
+  win_length: 400         # 窗长 (25ms @ 16kHz)
+
+# ─── Energy VAD ──────────────────────────────────────────────────────
+energy:
+  mode: "adaptive"         # fixed | adaptive
+  energy_thresh: null      # 固定阈值（adaptive 模式下忽略）
+  adaptive_ratio: 2.5      # 自适应阈值系数
+  zcr_enabled: false       # 是否联合过零率
+  smoothing_window: 3      # 中值滤波窗口
+  min_speech_frames: 5     # 最小语音帧数
+  min_silence_frames: 10   # 最大间隙帧数
+
+# ─── Spectral VAD ────────────────────────────────────────────────────
+spectral:
+  energy_weight: 0.4       # 能量权重
+  flatness_weight: 0.4     # 谱平坦度权重
+  centroid_weight: 0.2     # 谱质心权重
+  flatness_thresh: 0.6     # 谱平坦度阈值
+  centroid_low: 300        # 谱质心下界 (Hz)
+  centroid_high: 3500      # 谱质心上界 (Hz)
+  adaptive: true
+  smoothing_window: 5
+  min_speech_frames: 5
+  min_silence_frames: 15
+
+# ─── DNN VAD ─────────────────────────────────────────────────────────
+dnn:
+  n_mels: 40               # Fbank 维度
+  hidden: 64               # Conv 隐藏维度
+  gru_hidden: 64           # GRU 隐藏维度
+  dropout: 0.2
+  prob_threshold: 0.5      # 判决阈值
+  model_path: null         # 预训练模型路径
+
+# ─── 流式 VAD ────────────────────────────────────────────────────────
+streaming:
+  frame_ms: 20
+  window_ms: 200
+  hop_ms: 100
+  speech_threshold: 0.5
+  hangover_frames: 10
+  min_speech_frames: 5
+  min_silence_frames: 10
+
+# ─── 训练参数 ────────────────────────────────────────────────────────
+train:
+  method: "synthetic"      # synthetic | common_voice
+  epochs: 30
+  batch_size: 32
+  lr: 0.001
+  weight_decay: 1e-5
+  chunk_frames: 200        # 每样本帧数 (~2s)
+  stride_frames: 100       # 滑动步长
+  val_ratio: 0.1
+  device: "auto"
+  n_mels: 40
+  hidden: 64
+  gru_hidden: 64
+  dropout: 0.2
+  output_dir: "checkpoints"

@@ -22,9 +22,10 @@
     Output (T x 1)  帧级别语音概率
 """
 
-import numpy as np
-from typing import List, Optional, Tuple
 from dataclasses import dataclass
+from typing import List, Optional, Tuple
+
+import numpy as np
 
 from .feature_extractor import FeatureExtractor
 from .utils import mask_to_segments, merge_segments
@@ -133,13 +134,13 @@ class DNNVAD:
         if model_path is not None:
             self.load(model_path)
 
-    def load(self, path: str):
+    def load(self, path: str) -> None:
         """加载预训练权重。"""
         state = torch.load(path, map_location=self.device, weights_only=True)
         self.model.load_state_dict(state)
         self.model.eval()
 
-    def save(self, path: str):
+    def save(self, path: str) -> None:
         """保存模型权重。"""
         torch.save(self.model.state_dict(), path)
 

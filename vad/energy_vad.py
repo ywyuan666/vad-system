@@ -9,8 +9,10 @@
 缺点：对非平稳噪声敏感、阈值需要针对场景调整。
 """
 
-import numpy as np
 from typing import List, Optional, Tuple
+
+import numpy as np
+
 from .feature_extractor import FeatureExtractor
 from .utils import mask_to_segments, merge_segments
 

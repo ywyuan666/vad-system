@@ -11,8 +11,10 @@
 尤其在有背景音乐/环境噪声的场景下表现更好。
 """
 
-import numpy as np
 from typing import List, Optional, Tuple
+
+import numpy as np
+
 from .feature_extractor import FeatureExtractor
 from .utils import mask_to_segments, merge_segments, frames_to_time
 
