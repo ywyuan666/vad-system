@@ -11,9 +11,13 @@
 [![Ablation](https://img.shields.io/badge/Ablation-15_experiments-7B1FA2)](https://github.com/ywyuan666/vad-system)
 [![Model Card](https://img.shields.io/badge/Model_Card-available-00BCD4)](https://github.com/ywyuan666/vad-system)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-FAB040)](https://pre-commit.com/)
+[![Knowledge Distill](https://img.shields.io/badge/Distill-10x_compress-FF6F00)](https://github.com/ywyuan666/vad-system)
+[![Chinese VAD](https://img.shields.io/badge/Chinese-VAD_support-E91E63)](https://github.com/ywyuan666/vad-system)
+[![ASR Eval](https://img.shields.io/badge/ASR_Eval-WER_tracking-009688)](https://github.com/ywyuan666/vad-system)
+[![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-F37626)](https://jupyter.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **工业级 VAD 系统**，支持 **Energy / Spectral / DNN** 三种方法，含流式检测、ONNX 导出与 INT8 量化、**FastAPI 推理服务 (REST + WebSocket)**、**实时麦克风 Demo**、Docker 部署、**WebRTC VAD 基线对比**、**错误模式分析**、**消融实验**、**模型可解释性**、**集成 VAD**、**Python SDK**、**Model Card**。
+> **工业级 VAD 系统**，支持 **Energy / Spectral / DNN** 三种方法，含流式检测、ONNX 导出与 INT8 量化、**FastAPI 推理服务 (REST + WebSocket)**、**实时麦克风 Demo**、Docker 部署、**WebRTC VAD 基线对比**、**错误模式分析**、**消融实验**、**模型可解释性**、**集成 VAD**、**Python SDK**、**Model Card**、**知识蒸馏**、**中文语音支持**、**VAD+ASR 下游评估**。
 
 ```
 输入音频 ──► 特征提取 ──► VAD决策 ──► [(start₁, end₁), (start₂, end₂), ...]
@@ -594,17 +598,29 @@ vad-system/
 │   ├── inference.py            # 批量推理
 │   ├── export_onnx.py          # ONNX 导出
 │   ├── quantize_onnx.py        # ONNX INT8 量化
-│   ├── error_analysis.py       # 错误模式分析 ★ 新增
+│   ├── error_analysis.py       # 错误模式分析
+│   ├── ablation_study.py       # 消融实验 (15组)
+│   ├── model_interpretation.py # Grad-CAM 可解释性
+│   ├── knowledge_distill.py    # 知识蒸馏 (10x压缩)
+│   ├── vad_asr_eval.py         # VAD+ASR 联合评估
 │   └── download_pretrained.py  # 预训练模型下载
 ├── demo/
 │   ├── app.py                  # Gradio Web Demo
-│   └── realtime_vad.py         # 实时麦克风 VAD Demo ★ 新增
+│   ├── realtime_vad.py         # 实时麦克风 VAD Demo
+│   └── comparison_playground.py# 四方法对比 Playground
+├── notebooks/
+│   └── vad_demo.ipynb          # 端到端演示 Notebook
+├── data/
+│   └── generate_chinese_test.py# 中文语音测试数据
+├── client/
+│   └── vad_client.py           # Python SDK (同步/异步/WS)
 ├── docs/
-│   └── system_design.md        # 系统设计文档 (zh-CN) ★ 新增
+│   ├── system_design.md        # 系统设计文档 (zh-CN)
+│   └── MODEL_CARD.md           # Model Card (Google规范)
 ├── tests/test_vad.py           # 单元测试 (10 tests)
 ├── benchmark/benchmark.py      # 含 WebRTC VAD 基线对比
-├── .pre-commit-config.yaml     # Pre-commit 代码质量 ★ 新增
-├── Makefile                    # 工程自动化
+├── .pre-commit-config.yaml     # Pre-commit 代码质量
+├── Makefile                    # 工程自动化 (20+ 目标)
 ├── Dockerfile                  # Docker 一键部署
 ├── config/config.yaml          # 全局配置
 ├── requirements.txt

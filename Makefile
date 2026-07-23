@@ -21,6 +21,7 @@
 
 .PHONY: install train test benchmark export quantize demo realtime-demo server
 .PHONY: error-analysis ablation ablation-quick interpret docs lint precommit
+.PHONY: playground distill vad-asr-eval chinese-test
 .PHONY: docker docker-run docker-server clean
 
 install:
@@ -65,6 +66,18 @@ ablation-quick:
 interpret:
 	python scripts/model_interpretation.py --method all --output ./interpretation
 
+playground:
+	python demo/comparison_playground.py
+
+distill:
+	python scripts/knowledge_distill.py --epochs 20 --compare
+
+vad-asr-eval:
+	python scripts/vad_asr_eval.py --num_samples 5 --output ./eval_results
+
+chinese-test:
+	python data/generate_chinese_test.py --eval --num_samples 3
+
 docs:
 	@echo "📖 系统设计文档:     docs/system_design.md"
 	@echo "📖 Model Card:       docs/MODEL_CARD.md"
@@ -72,6 +85,8 @@ docs:
 	@echo "📖 面试 Q&A:         见 docs/system_design.md 第 8 章"
 	@echo "📖 消融实验:         make ablation"
 	@echo "📖 模型可解释性:     make interpret"
+	@echo "📖 Notebook:         notebooks/vad_demo.ipynb"
+	@echo "📖 对比 Playground:  make playground (端口 7862)"
 
 lint:
 	ruff check . --line-length=100
@@ -92,6 +107,6 @@ docker-server:
 
 clean:
 	rm -rf checkpoints/ results/ __pycache__/ .pytest_cache/ test_out*.txt test_err*.txt
-	rm -rf analysis/ ablation/ interpretation/
+	rm -rf analysis/ ablation/ interpretation/ eval_results/ student_models/
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
