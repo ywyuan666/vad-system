@@ -21,7 +21,7 @@
 
 .PHONY: install train test benchmark export quantize demo realtime-demo server
 .PHONY: error-analysis ablation ablation-quick interpret docs lint precommit
-.PHONY: playground distill vad-asr-eval chinese-test interview-prep
+.PHONY: playground distill vad-asr-eval chinese-test
 .PHONY: docker docker-run docker-server clean
 
 install:
@@ -80,7 +80,6 @@ chinese-test:
 
 docs:
 	@echo "📖 系统设计文档:     docs/system_design.md"
-	@echo "📖 面试准备笔记:     docs/interview_prep.pdf (面试必读)"
 	@echo "📖 Model Card:       docs/MODEL_CARD.md"
 	@echo "📖 API 文档:         http://localhost:8000/docs (启动 server 后)"
 	@echo "📖 面试 Q&A:         见 docs/system_design.md 第 8 章"
@@ -89,8 +88,7 @@ docs:
 	@echo "📖 Notebook:         notebooks/vad_demo.ipynb"
 	@echo "📖 对比 Playground:  make playground (端口 7862)"
 
-interview-prep:
-	python scripts/generate_interview_pdf.py
+
 
 lint:
 	ruff check . --line-length=100

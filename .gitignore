@@ -33,6 +33,8 @@ analysis/
 !analysis/.gitkeep
 
 # 生成的文档（构建产物）
+docs/*.pdf
+
 
 # IDE
 .vscode/
