@@ -51,6 +51,10 @@ jobs:
           pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
 
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --tb=short
+
       - name: Run import sanity check
         run: |
           python -c "from vad import EnergyVAD, SpectralVAD, DNNVAD; print('All imports OK')"
