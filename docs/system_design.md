@@ -1,6 +1,6 @@
 # VAD 系统设计文档
 
-> 本文档面向技术评审，展示系统架构设计能力与工程化思维。
+> 本文档展示系统架构设计能力与工程化思维。
 > 对应 GitHub 仓库: [ywyuan666/vad-system](https://github.com/ywyuan666/vad-system)
 
 ---
