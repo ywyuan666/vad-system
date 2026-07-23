@@ -82,7 +82,7 @@ docs:
 	@echo "📖 系统设计文档:     docs/system_design.md"
 	@echo "📖 Model Card:       docs/MODEL_CARD.md"
 	@echo "📖 API 文档:         http://localhost:8000/docs (启动 server 后)"
-	@echo "📖 面试 Q&A:         见 docs/system_design.md 第 8 章"
+
 	@echo "📖 消融实验:         make ablation"
 	@echo "📖 模型可解释性:     make interpret"
 	@echo "📖 Notebook:         notebooks/vad_demo.ipynb"
